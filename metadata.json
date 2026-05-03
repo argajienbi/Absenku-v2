@@ -1,0 +1,6 @@
+{
+  "name": "Attendo",
+  "description": "A attendance tracking system with geofencing and facial recognition support.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": []
+}

@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all default block
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      // Bootstrap superadmin
+      return isSignedIn() && (
+        request.auth.token.email == 'armin.gandi@gmail.com' ||
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['superadmin', 'admin'])
+      );
+    }
+    
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'armin.gandi@gmail.com' ||
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
+      );
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) {
+       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Validation definitions
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'name', 'role', 'createdAt']) &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 200 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.role is string && data.role in ['superadmin', 'admin', 'staff', 'crew'] &&
+        data.createdAt is number;
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['userId', 'timestamp', 'type', 'method']) &&
+        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        data.timestamp is number &&
+        data.type is string && (data.type == 'in' || data.type == 'out') &&
+        data.method is string && data.method in ['selfie', 'qr', 'rfid', 'manual'];
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['geofenceEnabled', 'officeLat', 'officeLng', 'radiusMeters']) &&
+        data.geofenceEnabled is bool &&
+        data.officeLat is number &&
+        data.officeLng is number &&
+        data.radiusMeters is number;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && isAdmin(); // Only admins can list users
+      allow create: if isSignedIn() && userId == request.auth.uid &&
+        isValidId(userId) &&
+        isValidUser(incoming()) &&
+        // Self-registration defaults to 'staff' unless created by superadmin
+        (incoming().role == 'staff' || isSuperAdmin());
+      allow update: if isSignedIn() && isValidUser(incoming()) && (
+        // User can update their own name/avatar
+        (userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatarUrl', 'rfid'])) ||
+        // Superadmins can update role
+        (isSuperAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'name', 'avatarUrl', 'rfid'])) ||
+        isAdmin()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(attendanceId) &&
+        isValidAttendance(incoming()) &&
+        // Users can log for themselves, or Admins can log for them (e.g. tablet mode)
+        (incoming().userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin() && isValidAttendance(incoming());
+      allow delete: if isSuperAdmin();
+    }
+
+    match /settings/{settingsId} {
+      allow get, list: if isSignedIn(); // anyone can read settings
+      allow create: if isSuperAdmin() && isValidId(settingsId) && isValidSettings(incoming());
+      allow update: if (isAdmin() || isSuperAdmin()) && isValidSettings(incoming());
+      allow delete: if isSuperAdmin();
+    }
+  }
+}

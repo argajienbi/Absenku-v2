@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["superadmin", "admin", "staff", "crew"],
+          "description": "Role of the user in the system"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "Photo/avatar url for face id or profile"
+        },
+        "rfid": {
+          "type": "string",
+          "description": "RFID tag ID associated with user"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Timestamp of creation"
+        }
+      },
+      "required": ["email", "name", "role", "createdAt"]
+    },
+    "Attendance": {
+      "title": "Attendance record",
+      "description": "A single clock-in or clock-out record",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user who clocked in"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Millisecond timestamp of the scan"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["in", "out"]
+        },
+        "method": {
+          "type": "string",
+          "enum": ["selfie", "qr", "rfid", "manual"]
+        },
+        "photoBase64": {
+          "type": "string",
+          "description": "Base64 image of the person taking attendance"
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "withinRadius": {
+          "type": "boolean"
+        }
+      },
+      "required": ["userId", "timestamp", "type", "method"]
+    },
+    "Settings": {
+      "title": "Global System Settings",
+      "description": "Geofencing rules and global config",
+      "type": "object",
+      "properties": {
+        "geofenceEnabled": {
+          "type": "boolean"
+        },
+        "officeLat": {
+          "type": "number"
+        },
+        "officeLng": {
+          "type": "number"
+        },
+        "radiusMeters": {
+          "type": "number"
+        }
+      },
+      "required": ["geofenceEnabled", "officeLat", "officeLng", "radiusMeters"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles"
+    },
+    "attendance/{attendanceId}": {
+      "schema": {
+        "$ref": "#/entities/Attendance"
+      },
+      "description": "Log of clock ins and clock outs"
+    },
+    "settings/{settingsId}": {
+      "schema": {
+        "$ref": "#/entities/Settings"
+      },
+      "description": "System settings like geofencing rules. The singleton doc is usually settings/global"
+    }
+  }
+}
