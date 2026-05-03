@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { format, isSameDay, isWeekend } from "date-fns";
 import { id } from "date-fns/locale";
 import Webcam from "react-webcam";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { useTheme } from "next-themes";
 import { verifyFace } from "../lib/faceVerification";
 import {
@@ -36,7 +36,7 @@ export default function UserApp() {
   const [view, setView] = useState<"home" | "absen" | "history" | "profile">("home");
   
   // Home states
-  const [type, setType] = useState<"in" | "out" | "overtime_in" | "overtime_out">("in");
+  const [type, setType] = useState<"in" | "out" | "overtime_in" | "overtime_out" | "sick" | "permit">("in");
   const [activeAbsenTab, setActiveAbsenTab] = useState("selfie");
   const webcamRef = useRef<Webcam>(null);
   const [rfidInput, setRfidInput] = useState("");
@@ -162,23 +162,65 @@ export default function UserApp() {
   }, [settings]);
 
   useEffect(() => {
+    let ht5Qrcode: Html5Qrcode | null = null;
+    let isMounted = true;
+    let timer: any;
+    
     if (view === "absen" && activeAbsenTab === "qr") {
-      try {
-        const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-        scanner.render((decodedText) => {
-          scanner.clear();
-          handleAttendance("qr", decodedText);
-        }, undefined);
-        return () => { scanner.clear().catch(console.error); };
-      } catch (e) {
-        console.error("QR scanner error: ", e);
-      }
+      const startScanner = async () => {
+        try {
+          ht5Qrcode = new Html5Qrcode("qr-reader");
+          await ht5Qrcode.start(
+            { facingMode: "environment" },
+            {
+               fps: 10,
+               qrbox: { width: 250, height: 250 }
+            },
+            (decodedText) => {
+               if (ht5Qrcode && ht5Qrcode.isScanning) {
+                  ht5Qrcode.stop().then(() => {
+                      ht5Qrcode?.clear();
+                      if (isMounted) handleAttendance("qr", decodedText);
+                  }).catch(console.error);
+               }
+            },
+            () => {} // ignore scan failures
+          );
+          
+          // If component unmounted while starting camera
+          if (!isMounted && ht5Qrcode && ht5Qrcode.isScanning) {
+             ht5Qrcode.stop().then(() => ht5Qrcode?.clear()).catch(console.error);
+          }
+        } catch (e) {
+          console.error("QR scanner start error: ", e);
+        }
+      };
+
+      // Delay start to allow Webcam component to release the camera fully
+      timer = setTimeout(() => {
+        if (isMounted) {
+          startScanner();
+        }
+      }, 500);
+
+      return () => { 
+        isMounted = false;
+        clearTimeout(timer);
+        if (ht5Qrcode && ht5Qrcode.isScanning) {
+           ht5Qrcode.stop().then(() => {
+              ht5Qrcode?.clear();
+           }).catch(console.error);
+        }
+      };
     }
   }, [view, activeAbsenTab, type]);
 
   const handleAttendance = async (method: "selfie" | "qr" | "rfid", extraData?: string) => {
     if (!user) return;
-    if (settings?.geofenceEnabled && !isWithinRadius) {
+    
+    const isSickOrPermit = type === "sick" || type === "permit";
+
+    if (settings?.geofenceEnabled && !isWithinRadius && !isSickOrPermit) {
       toast.error("Anda berada di luar radius kantor!");
       return;
     }
@@ -229,6 +271,8 @@ export default function UserApp() {
         if (isEarlyLeave) status = "pending_approval";
       } else if (type === "overtime_in" || type === "overtime_out") {
         status = "pending_approval"; // Lembur perlu approval admin
+      } else if (type === "sick" || type === "permit") {
+        status = "pending_approval"; // Sakit dan izin perlu approval admin
       }
 
       if (method === "qr") {
@@ -252,7 +296,10 @@ export default function UserApp() {
         if (t === 'in') return 'Masuk';
         if (t === 'out') return 'Pulang';
         if (t === 'overtime_in') return 'Lembur Masuk';
-        return 'Lembur Pulang';
+        if (t === 'overtime_out') return 'Lembur Pulang';
+        if (t === 'sick') return 'Sakit';
+        if (t === 'permit') return 'Izin';
+        return 'Lainnya';
       };
 
       toast.success(`Berhasil Absen ${formatTypeRaw(type)}${status === "pending_approval" ? " (Menunggu Approval Admin)" : ""}`);
@@ -347,6 +394,20 @@ export default function UserApp() {
                     <LogOut className="w-8 h-8 mb-2 opacity-80" />
                     <span className="text-sm">Lembur Pulang</span>
                   </button>
+                  <button 
+                    onClick={() => { setType("sick"); setView("absen"); }}
+                    className="p-6 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-2xl flex flex-col items-center justify-center font-bold shadow-lg transition-transform active:scale-95"
+                  >
+                    <UserSquare2 className="w-8 h-8 mb-2 opacity-80" />
+                    <span className="text-sm">Sakit</span>
+                  </button>
+                  <button 
+                    onClick={() => { setType("permit"); setView("absen"); }}
+                    className="p-6 bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white rounded-2xl flex flex-col items-center justify-center font-bold shadow-lg transition-transform active:scale-95"
+                  >
+                    <CalendarDays className="w-8 h-8 mb-2 opacity-80" />
+                    <span className="text-sm">Izin</span>
+                  </button>
                 </div>
              </div>
            )}
@@ -358,7 +419,7 @@ export default function UserApp() {
                       <ArrowLeft className="w-5 h-5" />
                    </button>
                    <h2 className="text-xl font-bold ml-2 dark:text-gray-100">
-                      Proses Absen {type === 'in' ? 'Masuk' : type === 'out' ? 'Pulang' : type === 'overtime_in' ? 'Lembur Masuk' : 'Lembur Pulang'}
+                      Proses Absen {type === 'in' ? 'Masuk' : type === 'out' ? 'Pulang' : type === 'overtime_in' ? 'Lembur Masuk' : type === 'overtime_out' ? 'Lembur Pulang' : type === 'sick' ? 'Sakit' : 'Izin'}
                    </h2>
                 </div>
 
@@ -373,27 +434,48 @@ export default function UserApp() {
                       
                       <TabsContent value="selfie" className="space-y-4">
                         <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden relative shadow-inner">
-                          <Webcam
-                            audio={false}
-                            ref={webcamRef}
-                            screenshotFormat="image/jpeg"
-                            className="w-full h-full object-cover"
-                            videoConstraints={{ facingMode: "user" }}
-                          />
+                          {activeAbsenTab === 'selfie' && (
+                            <Webcam
+                              audio={false}
+                              ref={webcamRef}
+                              screenshotFormat="image/jpeg"
+                              className="w-full h-full object-cover"
+                              videoConstraints={{ facingMode: "user" }}
+                            />
+                          )}
                           <div className="absolute inset-0 border-4 border-dashed border-white/30 m-4 rounded-lg pointer-events-none"></div>
                         </div>
                         <Button 
-                          className={`w-full text-xs font-bold uppercase tracking-wider h-11 shadow-sm text-white ${type === 'in' ? 'bg-teal-600 hover:bg-teal-700' : type === 'overtime_in' ? 'bg-amber-600 hover:bg-amber-700' : type === 'overtime_out' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-purple-600 hover:bg-purple-700'}`} 
+                          className={`w-full text-xs font-bold uppercase tracking-wider h-11 shadow-sm text-white ${type === 'in' ? 'bg-teal-600 hover:bg-teal-700' : type === 'overtime_in' ? 'bg-amber-600 hover:bg-amber-700' : type === 'overtime_out' ? 'bg-rose-600 hover:bg-rose-700' : type === 'sick' ? 'bg-blue-600 hover:bg-blue-700' : type === 'permit' ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-purple-600 hover:bg-purple-700'}`} 
                           onClick={() => handleAttendance("selfie")} 
-                          disabled={loading || (settings?.geofenceEnabled && !isWithinRadius)}
+                          disabled={loading || (settings?.geofenceEnabled && !isWithinRadius && type !== 'sick' && type !== 'permit')}
                         >
-                          {loading ? "Memproses..." : `Take Selfie & ${type.includes('in') ? 'Masuk' : 'Pulang'}`}
+                          {loading ? "Memproses..." : `Take Selfie & ${type.includes('in') ? 'Masuk' : type.includes('out') ? 'Pulang' : type === 'sick' ? 'Kirim Sakit' : 'Kirim Izin'}`}
                         </Button>
                       </TabsContent>
 
                       <TabsContent value="qr" className="space-y-4">
-                        <div id="qr-reader" className="overflow-hidden rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"></div>
-                        <p className="text-center text-xs text-gray-500 dark:text-gray-400">Arahkan kamera ke QR Code absen.</p>
+                        <style>{`
+                          @keyframes qr-scan {
+                            0% { top: 0%; opacity: 0; }
+                            10% { opacity: 1; }
+                            90% { opacity: 1; }
+                            100% { top: 100%; opacity: 0; }
+                          }
+                        `}</style>
+                        <div className="relative w-full max-w-sm mx-auto rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 aspect-square flex flex-col items-center justify-center">
+                          <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-2 text-gray-400">
+                             <Code className="w-10 h-10 animate-pulse" />
+                             <span className="text-xs font-medium">Menyalakan kamera...</span>
+                          </div>
+                          
+                          <div id="qr-reader" className="w-full h-full relative z-10 [&>video]:object-cover [&>video]:w-full [&>video]:h-full border-none"></div>
+                          
+                          <div className="absolute inset-8 border-2 border-teal-500/50 rounded-lg pointer-events-none z-20 overflow-hidden shadow-[inset_0_0_0_999px_rgba(0,0,0,0.3)]">
+                            <div className="absolute left-0 w-full h-0.5 bg-teal-400 shadow-[0_0_8px_2px_rgba(45,212,191,0.7)]" style={{ animation: 'qr-scan 2.5s ease-in-out infinite' }}></div>
+                          </div>
+                        </div>
+                        <p className="text-center text-xs text-gray-500 dark:text-gray-400">Posisikan QR Code persis di dalam kotak pindaian.</p>
                       </TabsContent>
 
                       <TabsContent value="rfid" className="space-y-4 py-8">

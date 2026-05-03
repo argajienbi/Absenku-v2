@@ -206,8 +206,8 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="px-4 py-2 font-mono text-[11px] font-semibold text-slate-600">{log.userId}</TableCell>
                         <TableCell className="px-4 py-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${log.type === 'in' ? 'bg-teal-100 text-teal-700' : log.type === 'out' ? 'bg-purple-100 text-purple-700' : log.type === 'overtime_in' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                            {log.type === 'in' ? 'MASUK' : log.type === 'out' ? 'PULANG' : log.type === 'overtime_in' ? 'LMBR MSK' : 'LMBR PLG'}
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${log.type === 'in' ? 'bg-teal-100 text-teal-700' : log.type === 'out' ? 'bg-purple-100 text-purple-700' : log.type === 'overtime_in' ? 'bg-amber-100 text-amber-700' : log.type === 'overtime_out' ? 'bg-rose-100 text-rose-700' : log.type === 'sick' ? 'bg-blue-100 text-blue-700' : 'bg-cyan-100 text-cyan-700'}`}>
+                            {log.type === 'in' ? 'MASUK' : log.type === 'out' ? 'PULANG' : log.type === 'overtime_in' ? 'LMBR MSK' : log.type === 'overtime_out' ? 'LMBR PLG' : log.type === 'sick' ? 'SAKIT' : 'IZIN'}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-2 uppercase text-[10px] font-bold text-slate-600">
