@@ -57,9 +57,7 @@ export async function verifyFace(selfieBase64: string, avatarUrl: string): Promi
     const avatar = await urlToBase64(avatarUrl);
 
     const req = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview", // Use a pro model for better vision comparison, wait no gemini-2.5-flash is faster and good enough
-      // But let's use what the docs say, wait gemini-2.5-flash since 3.1 may not be there for this sdk? The instructions: gemini-3.1-pro-preview
-      // Wait, skill says maybe gemini-2.5-flash. I will use gemini-2.5-flash.
+      model: "gemini-3-flash-preview", 
       contents: [
         {
           role: "user",

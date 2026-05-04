@@ -2,11 +2,11 @@ import React from 'react';
 
 export function WaveBackground({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen w-full relative bg-blue-50 overflow-hidden font-sans">
+    <div className="min-h-screen w-full relative bg-teal-50 dark:bg-gray-900 overflow-hidden font-sans transition-colors duration-500">
       {/* Background SVG Waves */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <svg
-          className="absolute top-0 w-full h-auto text-blue-500 opacity-20"
+          className="absolute top-0 w-full h-auto text-teal-500 dark:text-teal-900 opacity-20 dark:opacity-30 mix-blend-overlay"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 1440 320"
           preserveAspectRatio="none"
@@ -19,7 +19,7 @@ export function WaveBackground({ children }: { children: React.ReactNode }) {
         </svg>
 
         <svg
-          className="absolute bottom-0 w-full h-auto text-blue-600 opacity-20"
+          className="absolute bottom-0 w-full h-auto text-teal-600 dark:text-teal-800 opacity-20 dark:opacity-40 mix-blend-overlay"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 1440 320"
           preserveAspectRatio="none"

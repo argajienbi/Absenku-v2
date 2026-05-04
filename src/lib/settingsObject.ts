@@ -9,6 +9,8 @@ export interface SystemSettings {
   radiusMeters: number;
   shiftStart: string; // HH:mm format
   shiftEnd: string; // HH:mm format
+  appName?: string;
+  appLogoUrl?: string;
 }
 
 export function useSettings() {
@@ -23,7 +25,9 @@ export function useSettings() {
           setSettings({
             ...data,
             shiftStart: data.shiftStart || "09:00",
-            shiftEnd: data.shiftEnd || "17:00"
+            shiftEnd: data.shiftEnd || "17:00",
+            appName: data.appName || "ABSENKU",
+            appLogoUrl: data.appLogoUrl || ""
           });
         } else {
            // Provide safe defaults if no settings are configured yet
@@ -34,6 +38,8 @@ export function useSettings() {
              radiusMeters: 100,
              shiftStart: "09:00",
              shiftEnd: "17:00",
+             appName: "ABSENKU",
+             appLogoUrl: ""
            });
         }
       },
@@ -43,6 +49,12 @@ export function useSettings() {
     );
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (settings?.appName) {
+      document.title = settings.appName;
+    }
+  }, [settings?.appName]);
 
   return settings;
 }

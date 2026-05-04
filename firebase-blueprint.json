@@ -16,6 +16,11 @@
           "enum": ["superadmin", "admin", "staff", "crew"],
           "description": "Role of the user in the system"
         },
+        "shiftId": {
+          "type": "string",
+          "enum": ["shift1", "shift2", "shift3"],
+          "description": "Assigned work shift"
+        },
         "avatarUrl": {
           "type": "string",
           "description": "Photo/avatar url for face id or profile"

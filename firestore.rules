@@ -35,17 +35,19 @@ service cloud.firestore {
     // Validation definitions
     function isValidUser(data) {
       return data.keys().hasAll(['email', 'name', 'role', 'createdAt']) &&
-        data.email is string && data.email.size() > 0 && data.email.size() <= 200 &&
-        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() > 0 &&
+        data.name is string && data.name.size() > 0 &&
         data.role is string && data.role in ['superadmin', 'admin', 'staff', 'crew'] &&
-        data.createdAt is number;
+        data.createdAt is number &&
+        (!data.keys().hasAny(['shiftId']) || data.shiftId is string) &&
+        (!data.keys().hasAny(['waNumber']) || data.waNumber is string);
     }
 
     function isValidAttendance(data) {
       return data.keys().hasAll(['userId', 'timestamp', 'type', 'method']) &&
-        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        data.userId is string && data.userId.size() > 0 &&
         data.timestamp is number &&
-        data.type is string && (data.type == 'in' || data.type == 'out') &&
+        data.type is string && data.type in ['in', 'out', 'overtime_in', 'overtime_out', 'sick', 'permit'] &&
         data.method is string && data.method in ['selfie', 'qr', 'rfid', 'manual'];
     }
 
@@ -64,12 +66,11 @@ service cloud.firestore {
         isValidId(userId) &&
         isValidUser(incoming()) &&
         // Self-registration defaults to 'staff' unless created by superadmin
-        (incoming().role == 'staff' || isSuperAdmin());
+        (incoming().role == 'staff' || incoming().role == 'crew' || isSuperAdmin());
       allow update: if isSignedIn() && isValidUser(incoming()) && (
-        // User can update their own name/avatar
-        (userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatarUrl', 'rfid'])) ||
-        // Superadmins can update role
-        (isSuperAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'name', 'avatarUrl', 'rfid'])) ||
+        // User can update their own data (except role and shiftId)
+        (userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatarUrl', 'rfid', 'waNumber'])) ||
+        // Admins can change everything
         isAdmin()
       );
       allow delete: if isSuperAdmin();
@@ -87,9 +88,9 @@ service cloud.firestore {
     }
 
     match /settings/{settingsId} {
-      allow get, list: if isSignedIn(); // anyone can read settings
+      allow read: if true; // anyone can read settings (for appName and appLogo on Login)
       allow create: if isSuperAdmin() && isValidId(settingsId) && isValidSettings(incoming());
-      allow update: if (isAdmin() || isSuperAdmin()) && isValidSettings(incoming());
+      allow update: if (isAdmin() || isSuperAdmin()); // allow update since fields are dynamic now
       allow delete: if isSuperAdmin();
     }
   }
